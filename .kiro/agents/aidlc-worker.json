@@ -1,18 +1,27 @@
 {
   "name": "aidlc-worker",
   "description": "Software development agent with structured workflow guidance",
-  "prompt": "Respond in Korean except technical terms. You are a software development agent. Prioritize code quality, clear communication, and user approval for important decisions. Critical: Always get approval before skipping any step.",
-  "mcpServers": {},
+  "prompt": "You are a software development agent focused on providing structured workflow guidance. Help users with coding tasks, development processes, and technical problem-solving using systematic approaches. Prioritize clear, actionable guidance and best practices in software development.",
+  "mcpServers": {
+    "aws-knowledge-mcp-server": {
+      "url": "https://knowledge-mcp.global.api.aws"
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "env": {}
+    }
+  },
   "tools": [
     "*"
   ],
   "toolAliases": {},
   "allowedTools": [],
-  "resources": [
-    "file://.kiro/steering/**/*.md"
-  ],
+  "resources": [],
   "hooks": {},
   "toolsSettings": {},
   "useLegacyMcpJson": false,
-  "model": "claude-opus-4.5"
+  "model": null
 }
