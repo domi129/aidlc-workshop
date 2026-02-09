@@ -23,5 +23,5 @@
   "hooks": {},
   "toolsSettings": {},
   "useLegacyMcpJson": false,
-  "model": null
+  "model": "claude-opus-4.6"
 }
