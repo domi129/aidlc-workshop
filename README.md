@@ -1,64 +1,141 @@
-# AIDLC Workshop
+# Table Order Service - Customer Unit
 
-AIDLC (AI-Driven Development Life Cycle) 워크샵을 위한 사전 구성 프로젝트입니다.
+테이블 오더 서비스의 고객용 유닛입니다. 고객이 테이블 태블릿을 통해 메뉴를 조회하고 주문할 수 있는 서비스를 제공합니다.
 
-## 개요
+## 프로젝트 개요
 
-이 프로젝트는 AIDLC 워크샵 참가자들이 별도의 설정 없이 바로 실습을 시작할 수 있도록 필요한 파일과 구조를 미리 세팅해둔 템플릿입니다.
+**아키텍처**: Serverless (AWS Lambda + API Gateway + DynamoDB)
 
-## 시작하기
+**주요 기능**:
+- 테이블 자동 로그인
+- 메뉴 조회 및 필터링
+- 장바구니 관리
+- 주문 생성
+- 주문 내역 조회
+- 실시간 주문 상태 업데이트 (WebSocket)
 
-1. 이 프로젝트를 클론하거나 다운로드합니다
-2. 프로젝트 디렉토리에서 Kiro IDE 또는 Kiro CLI를 실행합니다
-3. 추가 설정 없이 AIDLC 워크플로우를 바로 시작할 수 있습니다
+## 기술 스택
 
-### 환경별 Agent 설정
+### Frontend
+- React 18
+- Vite (빌드 도구)
+- Zustand (상태 관리)
+- SWR (데이터 페칭)
+- Material-UI (UI 컴포넌트)
+- React Router v6
 
-이 프로젝트는 실행 환경에 따라 다른 Agent 설정을 사용합니다:
-
-- **Kiro IDE**: `AGENTS.md`를 이용하여 기본 Agent에 가이드 설정
-  - `.kiro/steering/` 디렉토리의 워크플로우 규칙 적용
-  - 한국어 응답 (기술 용어 제외)
-  - 구조화된 워크플로우 가이드
-  - 모든 단계에서 사용자 승인 필수
-
-- **Kiro CLI**: `.kiro/agents/aidlc-worker.json`의 agent 설정을 통해 Custom Agent 생성
-  - 한국어 응답 (기술 용어 제외)
-  - 구조화된 워크플로우 가이드
-  - 모든 단계에서 사용자 승인 필수
+### Backend
+- Node.js 18 (Lambda Runtime)
+- AWS Lambda (서버리스 함수)
+- API Gateway (REST + WebSocket)
+- DynamoDB (NoSQL 데이터베이스)
+- JWT (인증)
 
 ## 프로젝트 구조
 
 ```
-aidlc-workshop/
-├── .kiro/                          # Kiro 설정
-│   ├── agents/                     # Custom Agent 설정 (CLI용)
-│   │   └── aidlc-worker.json
-│   ├── steering/                   # AIDLC 워크플로우 규칙
-│   │   └── aws-aidlc-rules/
-│   └── aws-aidlc-rule-details/     # 상세 규칙 문서
-├── AGENTS.md                       # Agent 가이드 (IDE용)
-└── README.md                       # 프로젝트 설명
+.
+├── frontend/              # React SPA
+│   ├── src/
+│   │   ├── customer/     # Customer Unit 컴포넌트
+│   │   └── shared/       # 공유 컴포넌트
+│   └── package.json
+│
+├── backend/              # Lambda Functions
+│   ├── shared/           # 공유 유틸리티
+│   └── functions/        # Lambda 함수들
+│       ├── auth/
+│       ├── menus/
+│       ├── orders-create/
+│       ├── orders-list/
+│       ├── websocket-connect/
+│       ├── websocket-disconnect/
+│       ├── websocket-message/
+│       └── stream-processor/
+│
+└── aidlc-docs/           # 설계 문서
 ```
 
-## 사전 구성 내용
+## 시작하기
 
-- **AIDLC 워크플로우 규칙**: Inception, Construction, Operations 단계별 가이드
-- **Agent 설정**: aidlc-worker agent
-- **한국어 지원**: 기술 용어를 제외한 모든 응답이 한국어로 제공됩니다
+### 사전 요구사항
 
-## 워크플로우
+- Node.js 18 이상
+- AWS CLI 설정 완료
+- AWS 계정 및 권한
 
-AIDLC는 다음 단계로 구성됩니다:
+### Frontend 개발 환경 설정
 
-1. **Inception Phase**: 요구사항 분석, 설계, 계획 수립
-2. **Construction Phase**: 상세 설계, 코드 생성, 빌드 및 테스트
-3. **Operations Phase**: 배포 및 운영 (향후 확장 예정)
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## 요구사항
+Frontend는 `http://localhost:5173`에서 실행됩니다.
 
-- Kiro IDE 또는 Kiro CLI 설치
+### Backend 배포
+
+각 Lambda 함수를 개별적으로 배포합니다:
+
+```bash
+cd backend/functions/auth
+npm install --production
+zip -r function.zip .
+aws lambda update-function-code --function-name table-order-auth --zip-file fileb://function.zip
+```
+
+자세한 배포 방법은 `backend/README.md`를 참조하세요.
+
+## 환경 변수
+
+### Frontend (.env)
+
+```
+VITE_API_BASE_URL=https://your-api-gateway-url
+VITE_WS_URL=wss://your-websocket-url
+```
+
+### Backend (Lambda 환경 변수)
+
+```
+DYNAMODB_TABLE_NAME=table-order-data
+JWT_SECRET=your-secret-key
+JWT_ACCESS_EXPIRATION=16h
+JWT_REFRESH_EXPIRATION=30d
+AWS_REGION=ap-northeast-2
+```
+
+## API 문서
+
+API 문서는 `aidlc-docs/construction/customer-unit/code/api-documentation.md`를 참조하세요.
+
+## 배포
+
+### Frontend 배포 (S3 + CloudFront)
+
+```bash
+cd frontend
+npm run build
+aws s3 sync dist/ s3://table-order-frontend/ --delete
+aws cloudfront create-invalidation --distribution-id YOUR_DIST_ID --paths "/*"
+```
+
+### Backend 배포 (Lambda)
+
+```bash
+cd backend
+./deploy.sh
+```
+
+## 테스트
+
+테스트 실행 방법은 `aidlc-docs/construction/build-and-test/`의 문서를 참조하세요.
 
 ## 라이선스
 
-워크샵 교육용 프로젝트입니다.
+MIT License
+
+## 문의
+
+프로젝트 관련 문의사항은 이슈를 등록해주세요.

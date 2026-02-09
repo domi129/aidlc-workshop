@@ -1,23 +1,17 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
-import {
-  mockAdmins,
-  mockSessions,
-  mockOrders,
-  mockMenus,
-  mockTables,
-  mockOrderHistory
-} from './mockData';
+import SharedMockData from './sharedMockData';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'local-test-secret-key';
+
+// In-memory session storage (not persisted to file)
+const mockSessions = new Map<string, any>();
 
 // Mock Auth Service
 export class MockAuthService {
   async login(username: string, password: string, storeId: string) {
-    const admin = mockAdmins.find(
-      a => a.username === username && a.storeId === storeId
-    );
+    const admin = SharedMockData.getAdmin(username, storeId);
 
     if (!admin) {
       throw {
@@ -28,7 +22,6 @@ export class MockAuthService {
     }
 
     // For mock, accept any password (in real app, use bcrypt.compare)
-    // const isValid = await bcrypt.compare(password, admin.passwordHash);
     const isValid = true; // Mock: always valid
 
     if (!isValid) {
@@ -82,7 +75,8 @@ export class MockAuthService {
         throw new Error('Invalid or expired session');
       }
 
-      const admin = mockAdmins.find(a => a.adminId === decoded.adminId);
+      const admins = SharedMockData.getAdmins();
+      const admin = admins.find(a => a.adminId === decoded.adminId);
       if (!admin) {
         throw new Error('Admin not found');
       }
@@ -106,11 +100,11 @@ export class MockAuthService {
 // Mock Order Service
 export class MockOrderService {
   async getOrdersByStore(storeId: string) {
-    return mockOrders.filter(o => o.storeId === storeId);
+    return SharedMockData.getOrders(storeId);
   }
 
   async updateOrderStatus(orderId: string, status: string) {
-    const order = mockOrders.find(o => o.orderId === orderId);
+    const order = SharedMockData.getOrder(orderId);
     if (!order) {
       throw {
         code: 'NOT_FOUND',
@@ -134,15 +128,13 @@ export class MockOrderService {
       };
     }
 
-    order.status = status;
-    order.updatedAt = Date.now();
-
-    return order;
+    const updatedOrder = SharedMockData.updateOrder(orderId, { status });
+    return updatedOrder;
   }
 
   async deleteOrder(orderId: string) {
-    const index = mockOrders.findIndex(o => o.orderId === orderId);
-    if (index === -1) {
+    const order = SharedMockData.getOrder(orderId);
+    if (!order) {
       throw {
         code: 'NOT_FOUND',
         message: 'Order not found',
@@ -150,7 +142,6 @@ export class MockOrderService {
       };
     }
 
-    const order = mockOrders[index];
     if (order.status !== 'PENDING') {
       throw {
         code: 'INVALID_REQUEST',
@@ -159,7 +150,7 @@ export class MockOrderService {
       };
     }
 
-    mockOrders.splice(index, 1);
+    SharedMockData.deleteOrder(orderId);
     return { success: true };
   }
 }
@@ -167,7 +158,7 @@ export class MockOrderService {
 // Mock Menu Service
 export class MockMenuService {
   async getMenusByStore(storeId: string) {
-    return mockMenus.filter(m => m.storeId === storeId);
+    return SharedMockData.getMenus(storeId);
   }
 
   async createMenu(input: any) {
@@ -179,17 +170,17 @@ export class MockMenuService {
       description: input.description,
       category: input.category,
       imageUrl: input.imageUrl,
-      isAvailable: true,
+      isAvailable: input.isAvailable !== undefined ? input.isAvailable : true,
+      displayOrder: input.displayOrder || 999,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
 
-    mockMenus.push(menu);
-    return menu;
+    return SharedMockData.addMenu(menu);
   }
 
   async updateMenu(menuId: string, input: any) {
-    const menu = mockMenus.find(m => m.menuId === menuId);
+    const menu = SharedMockData.getMenu(menuId);
     if (!menu) {
       throw {
         code: 'NOT_FOUND',
@@ -198,13 +189,13 @@ export class MockMenuService {
       };
     }
 
-    Object.assign(menu, input, { updatedAt: Date.now() });
-    return menu;
+    const updatedMenu = SharedMockData.updateMenu(menuId, { ...input, updatedAt: Date.now() });
+    return updatedMenu;
   }
 
   async deleteMenu(menuId: string) {
-    const index = mockMenus.findIndex(m => m.menuId === menuId);
-    if (index === -1) {
+    const menu = SharedMockData.getMenu(menuId);
+    if (!menu) {
       throw {
         code: 'NOT_FOUND',
         message: 'Menu not found',
@@ -212,7 +203,7 @@ export class MockMenuService {
       };
     }
 
-    mockMenus.splice(index, 1);
+    SharedMockData.deleteMenu(menuId);
     return { success: true };
   }
 
@@ -228,7 +219,7 @@ export class MockMenuService {
 // Mock Table Service
 export class MockTableService {
   async completeSession(tableId: string, sessionId: string) {
-    const table = mockTables.find(t => t.tableId === tableId);
+    const table = SharedMockData.getTable(tableId);
     if (!table) {
       throw {
         code: 'NOT_FOUND',
@@ -237,68 +228,41 @@ export class MockTableService {
       };
     }
 
-    if (table.currentSessionId !== sessionId) {
-      throw {
-        code: 'INVALID_REQUEST',
-        message: 'Invalid session ID',
-        statusCode: 400
-      };
-    }
-
-    // Move orders to history
-    const sessionOrders = mockOrders.filter(
+    // For mock, we'll just mark orders as completed
+    const orders = SharedMockData.getOrders();
+    const sessionOrders = orders.filter(
       o => o.tableId === tableId && o.sessionId === sessionId
     );
 
+    let archivedCount = 0;
     sessionOrders.forEach(order => {
-      mockOrderHistory.push({
-        historyId: uuidv4(),
-        orderId: order.orderId,
-        storeId: order.storeId,
-        tableId: order.tableId,
-        sessionId: order.sessionId,
-        orderNumber: order.orderNumber,
-        items: order.items,
-        totalAmount: order.totalAmount,
-        status: order.status,
-        createdAt: order.createdAt,
-        completedAt: order.updatedAt,
-        archivedAt: Date.now()
-      });
-    });
-
-    // Remove orders from active orders
-    sessionOrders.forEach(order => {
-      const index = mockOrders.findIndex(o => o.orderId === order.orderId);
-      if (index !== -1) {
-        mockOrders.splice(index, 1);
+      if (order.status !== 'COMPLETED') {
+        SharedMockData.updateOrder(order.orderId, { status: 'COMPLETED' });
       }
+      archivedCount++;
     });
 
-    // Reset table
-    table.currentSessionId = uuidv4();
-    table.sessionStartTime = null as any;
-    table.updatedAt = Date.now();
-
-    return { success: true, archivedOrdersCount: sessionOrders.length };
+    return { success: true, archivedOrdersCount: archivedCount };
   }
 
   async getOrderHistory(tableId: string, filters: any) {
-    let history = mockOrderHistory.filter(h => h.tableId === tableId);
+    // Get all orders for the table (no separate history in mock mode)
+    let orders = SharedMockData.getOrders();
+    let history = orders.filter(o => o.tableId === tableId);
 
     // Apply date filters
     if (filters.startDate) {
       const startTime = new Date(filters.startDate).getTime();
-      history = history.filter(h => h.archivedAt >= startTime);
+      history = history.filter(h => h.createdAt >= startTime);
     }
 
     if (filters.endDate) {
       const endTime = new Date(filters.endDate).getTime();
-      history = history.filter(h => h.archivedAt <= endTime);
+      history = history.filter(h => h.createdAt <= endTime);
     }
 
-    // Sort by archivedAt descending
-    history.sort((a, b) => b.archivedAt - a.archivedAt);
+    // Sort by createdAt descending
+    history.sort((a, b) => b.createdAt - a.createdAt);
 
     // Pagination
     const page = filters.page || 1;
@@ -306,8 +270,22 @@ export class MockTableService {
     const startIndex = (page - 1) * pageSize;
     const endIndex = startIndex + pageSize;
 
+    // Transform to match expected format
+    const items = history.slice(startIndex, endIndex).map(order => ({
+      historyId: order.orderId, // Use orderId as historyId in mock mode
+      orderId: order.orderId,
+      orderNumber: order.orderNumber,
+      tableId: order.tableId,
+      sessionId: order.sessionId,
+      items: order.items,
+      totalAmount: order.totalAmount,
+      status: order.status,
+      createdAt: order.createdAt,
+      archivedAt: order.updatedAt || order.createdAt // Use updatedAt as archivedAt
+    }));
+
     return {
-      items: history.slice(startIndex, endIndex),
+      items,
       total: history.length,
       page,
       pageSize

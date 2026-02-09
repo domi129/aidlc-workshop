@@ -1,0 +1,246 @@
+{
+  "tables": [
+    {
+      "tableId": "T001",
+      "storeId": "STORE123",
+      "tableNumber": "T001",
+      "tablePassword": "1234"
+    },
+    {
+      "tableId": "T002",
+      "storeId": "STORE123",
+      "tableNumber": "T002",
+      "tablePassword": "1234"
+    },
+    {
+      "tableId": "T003",
+      "storeId": "STORE123",
+      "tableNumber": "T003",
+      "tablePassword": "1234"
+    }
+  ],
+  "menus": [
+    {
+      "menuId": "menu-001",
+      "storeId": "STORE123",
+      "menuName": "김치찌개",
+      "price": 8000,
+      "description": "얼큰한 김치찌개",
+      "category": "메인",
+      "imageUrl": "https://em-content.zobj.net/source/apple/391/pot-of-food_1f372.png",
+      "displayOrder": 1,
+      "isAvailable": true
+    },
+    {
+      "menuId": "menu-002",
+      "storeId": "STORE123",
+      "menuName": "된장찌개",
+      "price": 7000,
+      "description": "구수한 된장찌개",
+      "category": "메인",
+      "imageUrl": "https://em-content.zobj.net/source/apple/391/steaming-bowl_1f35c.png",
+      "displayOrder": 2,
+      "isAvailable": true
+    },
+    {
+      "menuId": "menu-003",
+      "storeId": "STORE123",
+      "menuName": "제육볶음",
+      "price": 9000,
+      "description": "매콤한 제육볶음",
+      "category": "메인",
+      "imageUrl": "https://em-content.zobj.net/source/apple/391/cut-of-meat_1f969.png",
+      "displayOrder": 3,
+      "isAvailable": true
+    },
+    {
+      "menuId": "menu-004",
+      "storeId": "STORE123",
+      "menuName": "계란말이",
+      "price": 5000,
+      "description": "부드러운 계란말이",
+      "category": "사이드",
+      "imageUrl": "https://em-content.zobj.net/source/apple/391/cooking_1f373.png",
+      "displayOrder": 4,
+      "isAvailable": true
+    },
+    {
+      "menuId": "menu-005",
+      "storeId": "STORE123",
+      "menuName": "김치전",
+      "price": 6000,
+      "description": "바삭한 김치전",
+      "category": "사이드",
+      "imageUrl": "https://em-content.zobj.net/source/apple/391/pancakes_1f95e.png",
+      "displayOrder": 5,
+      "isAvailable": true
+    },
+    {
+      "menuId": "menu-006",
+      "storeId": "STORE123",
+      "menuName": "콜라",
+      "price": 2000,
+      "description": "시원한 콜라",
+      "category": "음료",
+      "imageUrl": "https://em-content.zobj.net/source/apple/391/cup-with-straw_1f964.png",
+      "displayOrder": 6,
+      "isAvailable": true
+    },
+    {
+      "menuId": "menu-007",
+      "storeId": "STORE123",
+      "menuName": "사이다",
+      "price": 2000,
+      "description": "시원한 사이다",
+      "category": "음료",
+      "imageUrl": "https://em-content.zobj.net/source/apple/391/beverage-box_1f9c3.png",
+      "displayOrder": 7,
+      "isAvailable": true
+    }
+  ],
+  "orders": [
+    {
+      "orderId": "7229f689-53b2-4c1e-a90d-12e4c885eedc",
+      "orderNumber": 315,
+      "storeId": "STORE123",
+      "tableId": "T001",
+      "sessionId": "session-1770620481501",
+      "items": [
+        {
+          "menuId": "menu-004",
+          "menuName": "계란말이",
+          "quantity": 1,
+          "unitPrice": 5000,
+          "subtotal": 5000
+        }
+      ],
+      "totalAmount": 5000,
+      "status": "COMPLETED",
+      "createdAt": 1770621090315,
+      "updatedAt": 1770621417806
+    },
+    {
+      "orderId": "2854f624-4ffd-44ba-867d-b5fd2181613e",
+      "orderNumber": 753,
+      "storeId": "STORE123",
+      "tableId": "T001",
+      "sessionId": "3a768849-c172-4e6f-b4f5-588223159d95",
+      "items": [
+        {
+          "menuId": "menu-001",
+          "menuName": "김치찌개",
+          "quantity": 2,
+          "unitPrice": 8000,
+          "subtotal": 16000
+        },
+        {
+          "menuId": "menu-002",
+          "menuName": "된장찌개",
+          "quantity": 1,
+          "unitPrice": 7000,
+          "subtotal": 7000
+        }
+      ],
+      "totalAmount": 23000,
+      "status": "COMPLETED",
+      "createdAt": 1770621140754,
+      "updatedAt": 1770621140802
+    },
+    {
+      "orderId": "90c847f3-3911-41fd-a1d7-ff7b8b0b8f8c",
+      "orderNumber": 1538,
+      "storeId": "STORE123",
+      "tableId": "T001",
+      "sessionId": "session-1770620481501",
+      "items": [
+        {
+          "menuId": "menu-002",
+          "menuName": "된장찌개",
+          "quantity": 1,
+          "unitPrice": 7000,
+          "subtotal": 7000
+        }
+      ],
+      "totalAmount": 7000,
+      "status": "COMPLETED",
+      "createdAt": 1770621171539,
+      "updatedAt": 1770621908840
+    },
+    {
+      "orderId": "b34f01a9-0a9c-4fda-86b8-8c0a2769131a",
+      "orderNumber": 2311,
+      "storeId": "STORE123",
+      "tableId": "T001",
+      "sessionId": "session-1770620481501",
+      "items": [
+        {
+          "menuId": "menu-003",
+          "menuName": "제육볶음",
+          "quantity": 1,
+          "unitPrice": 9000,
+          "subtotal": 9000
+        }
+      ],
+      "totalAmount": 9000,
+      "status": "COMPLETED",
+      "createdAt": 1770621562312,
+      "updatedAt": 1770621909980
+    },
+    {
+      "orderId": "d273dac8-8c40-49a6-a693-9076eeb92768",
+      "orderNumber": 2388,
+      "storeId": "STORE123",
+      "tableId": "T001",
+      "sessionId": "session-1770620481501",
+      "items": [
+        {
+          "menuId": "menu-003",
+          "menuName": "제육볶음",
+          "quantity": 1,
+          "unitPrice": 9000,
+          "subtotal": 9000
+        }
+      ],
+      "totalAmount": 9000,
+      "status": "COMPLETED",
+      "createdAt": 1770621612388,
+      "updatedAt": 1770621910918
+    },
+    {
+      "orderId": "56f1f6fb-954f-4972-b16e-b3bdbca8627f",
+      "orderNumber": 9394,
+      "storeId": "STORE123",
+      "tableId": "T001",
+      "sessionId": "session-1770620481501",
+      "items": [
+        {
+          "menuId": "menu-005",
+          "menuName": "김치전",
+          "quantity": 1,
+          "unitPrice": 6000,
+          "subtotal": 6000
+        }
+      ],
+      "totalAmount": 6000,
+      "status": "COMPLETED",
+      "createdAt": 1770622359395,
+      "updatedAt": 1770622372250
+    }
+  ],
+  "admins": [
+    {
+      "adminId": "admin-001",
+      "storeId": "STORE123",
+      "username": "admin1",
+      "passwordHash": "$2b$10$dummy",
+      "role": "Admin"
+    },
+    {
+      "adminId": "admin-002",
+      "storeId": "STORE123",
+      "username": "manager1",
+      "passwordHash": "$2b$10$dummy",
+      "role": "Manager"
+    }
+  ]
+}

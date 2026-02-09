@@ -34,7 +34,8 @@ export const mockOrders = [
         menuId: 'menu-001',
         menuName: '김치찌개',
         quantity: 2,
-        price: 8000
+        unitPrice: 8000,
+        subtotal: 16000
       }
     ],
     totalAmount: 16000,
@@ -47,19 +48,47 @@ export const mockOrders = [
     storeId: 'store-001',
     tableId: 'table-002',
     sessionId: 'session-002',
-    orderNumber: 1,
+    orderNumber: 2,
     items: [
       {
         menuId: 'menu-002',
         menuName: '된장찌개',
         quantity: 1,
-        price: 7000
+        unitPrice: 7000,
+        subtotal: 7000
+      },
+      {
+        menuId: 'menu-003',
+        menuName: '제육볶음',
+        quantity: 1,
+        unitPrice: 9000,
+        subtotal: 9000
       }
     ],
-    totalAmount: 7000,
+    totalAmount: 16000,
     status: 'PREPARING',
     createdAt: Date.now() - 1800000,
     updatedAt: Date.now() - 1800000
+  },
+  {
+    orderId: 'order-003',
+    storeId: 'store-001',
+    tableId: 'table-003',
+    sessionId: 'session-003',
+    orderNumber: 3,
+    items: [
+      {
+        menuId: 'menu-001',
+        menuName: '김치찌개',
+        quantity: 1,
+        unitPrice: 8000,
+        subtotal: 8000
+      }
+    ],
+    totalAmount: 8000,
+    status: 'COMPLETED',
+    createdAt: Date.now() - 7200000,
+    updatedAt: Date.now() - 3600000
   }
 ];
 

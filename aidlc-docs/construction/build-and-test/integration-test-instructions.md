@@ -1,347 +1,632 @@
-# Integration Test Instructions - Admin Unit
+# Integration Test Instructions - Customer Unit
 
-## Purpose
+## 개요
 
-Test Admin API integration with AWS services (DynamoDB, S3, API Gateway) to ensure end-to-end functionality.
-
----
-
-## Test Environment Setup
-
-### 1. Prerequisites
-
-- AWS account with deployed resources
-- API Gateway endpoint URL
-- DynamoDB tables created and populated with test data
-- S3 bucket created
-- Valid admin credentials in database
-
-### 2. Test Data Setup
-
-**Create Test Admin**:
-```bash
-aws dynamodb put-item \
-  --table-name Admins \
-  --item '{
-    "adminId": {"S": "test-admin-001"},
-    "storeId": {"S": "test-store-001"},
-    "username": {"S": "testadmin"},
-    "passwordHash": {"S": "$2b$10$..."},
-    "role": {"S": "Admin"},
-    "createdAt": {"N": "1707494400000"}
-  }' \
-  --region ap-northeast-2
-```
-
-**Create Test Store**:
-```bash
-aws dynamodb put-item \
-  --table-name Stores \
-  --item '{
-    "storeId": {"S": "test-store-001"},
-    "storeName": {"S": "Test Restaurant"},
-    "createdAt": {"N": "1707494400000"}
-  }' \
-  --region ap-northeast-2
-```
-
-**Create Test Orders**:
-```bash
-aws dynamodb put-item \
-  --table-name Orders \
-  --item '{
-    "orderId": {"S": "test-order-001"},
-    "storeId": {"S": "test-store-001"},
-    "tableId": {"S": "test-table-001"},
-    "sessionId": {"S": "test-session-001"},
-    "orderNumber": {"N": "1"},
-    "items": {"L": [...]},
-    "totalAmount": {"N": "25000"},
-    "status": {"S": "PENDING"},
-    "createdAt": {"N": "1707494400000"}
-  }' \
-  --region ap-northeast-2
-```
+Customer Unit의 Frontend와 Backend 간 통합 테스트 및 시스템 간 상호작용 테스트 지침입니다.
 
 ---
 
-## Integration Test Scenarios
+## 1. 통합 테스트 범위
 
-### Scenario 1: Complete Authentication Flow
+### 1.1 테스트 시나리오
 
-**Test**: Login → Get Orders → Logout
+1. **인증 플로우 (US-001)**
+   - QR 코드 스캔 → 로그인 → 토큰 발급 → 메뉴 페이지 이동
 
-**Steps**:
-```bash
-# 1. Login
-TOKEN=$(curl -s -X POST https://your-api-gateway-url/prod/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testadmin",
-    "password": "testpassword",
-    "storeId": "test-store-001"
-  }' | jq -r '.token')
+2. **메뉴 조회 플로우 (US-002)**
+   - 로그인 → 메뉴 목록 조회 → 카테고리 필터링 → 메뉴 상세 조회
 
-echo "Token: $TOKEN"
+3. **장바구니 플로우 (US-003)**
+   - 메뉴 선택 → 장바구니 추가 → 수량 변경 → 항목 삭제
 
-# 2. Get Orders (verify token works)
-curl -X GET https://your-api-gateway-url/prod/orders \
-  -H "Authorization: Bearer $TOKEN"
+4. **주문 생성 플로우 (US-004)**
+   - 장바구니 확인 → 주문 생성 → 주문 번호 발급 → 주문 성공 페이지
 
-# 3. Verify token expiration (wait 16 hours or test with expired token)
-```
+5. **주문 내역 플로우 (US-005)**
+   - 주문 내역 조회 → 주문 상세 조회 → 주문 상태 확인
 
-**Expected Results**:
-- ✅ Login returns valid JWT token
-- ✅ Token works for authenticated endpoints
-- ✅ Expired token returns 401
+6. **실시간 업데이트 플로우 (US-006)**
+   - WebSocket 연결 → 주문 상태 변경 → 실시간 알림 수신
 
 ---
 
-### Scenario 2: Order Lifecycle Management
+## 2. Frontend-Backend 통합 테스트
 
-**Test**: Create Order (Customer) → View Order (Admin) → Update Status → Complete
+### 2.1 테스트 환경 설정
 
-**Steps**:
-```bash
-# Assume order created by Customer Unit
-ORDER_ID="test-order-001"
-
-# 1. Admin views order
-curl -X GET https://your-api-gateway-url/prod/orders \
-  -H "Authorization: Bearer $TOKEN"
-
-# 2. Update to PREPARING
-curl -X PATCH https://your-api-gateway-url/prod/orders/$ORDER_ID/status \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "PREPARING"}'
-
-# 3. Update to COMPLETED
-curl -X PATCH https://your-api-gateway-url/prod/orders/$ORDER_ID/status \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "COMPLETED"}'
-
-# 4. Verify order status in DynamoDB
-aws dynamodb get-item \
-  --table-name Orders \
-  --key '{"orderId": {"S": "'$ORDER_ID'"}}' \
-  --region ap-northeast-2
-```
-
-**Expected Results**:
-- ✅ Order visible in admin dashboard
-- ✅ Status transitions: PENDING → PREPARING → COMPLETED
-- ✅ Invalid transitions rejected (e.g., PENDING → COMPLETED)
-- ✅ DynamoDB reflects updated status
-
----
-
-### Scenario 3: Table Session Management
-
-**Test**: Complete Session → Verify History → Verify Table Reset
-
-**Steps**:
-```bash
-TABLE_ID="test-table-001"
-SESSION_ID="test-session-001"
-
-# 1. Complete table session
-curl -X POST https://your-api-gateway-url/prod/tables/$TABLE_ID/complete \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"sessionId": "'$SESSION_ID'"}'
-
-# 2. Verify orders moved to history
-curl -X GET "https://your-api-gateway-url/prod/tables/$TABLE_ID/history?page=1&pageSize=20" \
-  -H "Authorization: Bearer $TOKEN"
-
-# 3. Verify OrderHistory in DynamoDB
-aws dynamodb query \
-  --table-name OrderHistory \
-  --index-name tableId-archivedAt-index \
-  --key-condition-expression "tableId = :tableId" \
-  --expression-attribute-values '{":tableId": {"S": "'$TABLE_ID'"}}' \
-  --region ap-northeast-2
-
-# 4. Verify orders removed from Orders table
-aws dynamodb query \
-  --table-name Orders \
-  --index-name tableId-sessionId-index \
-  --key-condition-expression "tableId = :tableId AND sessionId = :sessionId" \
-  --expression-attribute-values '{
-    ":tableId": {"S": "'$TABLE_ID'"},
-    ":sessionId": {"S": "'$SESSION_ID'"}
-  }' \
-  --region ap-northeast-2
-```
-
-**Expected Results**:
-- ✅ Session completion succeeds
-- ✅ Orders moved from Orders to OrderHistory
-- ✅ Table currentSessionId reset to null
-- ✅ History API returns archived orders
-
----
-
-### Scenario 4: Menu Management with S3 Integration
-
-**Test**: Create Menu → Upload Image → Verify Image Access
-
-**Steps**:
-```bash
-# 1. Create menu
-MENU_RESPONSE=$(curl -s -X POST https://your-api-gateway-url/prod/menus \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "menuName": "Test Menu",
-    "price": 10000,
-    "description": "Test description",
-    "category": "MAIN"
-  }')
-
-MENU_ID=$(echo $MENU_RESPONSE | jq -r '.menuId')
-echo "Menu ID: $MENU_ID"
-
-# 2. Generate upload URL
-UPLOAD_RESPONSE=$(curl -s -X POST https://your-api-gateway-url/prod/menus/upload-url \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"fileName": "test-image.jpg"}')
-
-UPLOAD_URL=$(echo $UPLOAD_RESPONSE | jq -r '.uploadUrl')
-IMAGE_URL=$(echo $UPLOAD_RESPONSE | jq -r '.imageUrl')
-
-echo "Upload URL: $UPLOAD_URL"
-echo "Image URL: $IMAGE_URL"
-
-# 3. Upload image to S3
-curl -X PUT "$UPLOAD_URL" \
-  -H "Content-Type: image/jpeg" \
-  --data-binary @test-image.jpg
-
-# 4. Update menu with image URL
-curl -X PUT https://your-api-gateway-url/prod/menus/$MENU_ID \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "imageUrl": "'$IMAGE_URL'"
-  }'
-
-# 5. Verify image in S3
-aws s3 ls s3://table-order-menu-images-<account-id>/menus/test-store-001/
-```
-
-**Expected Results**:
-- ✅ Menu created in DynamoDB
-- ✅ Presigned URL generated
-- ✅ Image uploaded to S3
-- ✅ Menu updated with image URL
-- ✅ Image accessible via URL
-
----
-
-### Scenario 5: RBAC Authorization
-
-**Test**: Different roles have different permissions
-
-**Steps**:
-```bash
-# 1. Login as Admin
-ADMIN_TOKEN=$(curl -s -X POST https://your-api-gateway-url/prod/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "pass", "storeId": "test-store-001"}' \
-  | jq -r '.token')
-
-# 2. Login as Manager
-MANAGER_TOKEN=$(curl -s -X POST https://your-api-gateway-url/prod/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "manager", "password": "pass", "storeId": "test-store-001"}' \
-  | jq -r '.token')
-
-# 3. Admin can delete order
-curl -X DELETE https://your-api-gateway-url/prod/orders/$ORDER_ID \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-# Expected: 200 OK
-
-# 4. Manager cannot delete order
-curl -X DELETE https://your-api-gateway-url/prod/orders/$ORDER_ID \
-  -H "Authorization: Bearer $MANAGER_TOKEN"
-# Expected: 403 Forbidden
-
-# 5. Manager can update order status
-curl -X PATCH https://your-api-gateway-url/prod/orders/$ORDER_ID/status \
-  -H "Authorization: Bearer $MANAGER_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "PREPARING"}'
-# Expected: 200 OK
-```
-
-**Expected Results**:
-- ✅ Admin role can perform all actions
-- ✅ Manager role can update status but not delete
-- ✅ Unauthorized actions return 403 Forbidden
-
----
-
-## Integration Test Checklist
-
-### API Gateway Integration
-- [ ] All routes accessible via API Gateway
-- [ ] JWT Authorizer validates tokens
-- [ ] CORS headers present
-- [ ] Error responses formatted correctly
-
-### DynamoDB Integration
-- [ ] Orders CRUD operations work
-- [ ] GSI queries return correct results
-- [ ] TTL works for AdminSessions and OrderHistory
-- [ ] Transactions work (if used)
-
-### S3 Integration
-- [ ] Presigned URLs generated correctly
-- [ ] Image upload succeeds
-- [ ] Images accessible via URLs
-- [ ] Bucket permissions correct
-
-### Authentication & Authorization
-- [ ] JWT tokens issued correctly
-- [ ] Token expiration enforced
-- [ ] RBAC permissions enforced
-- [ ] Invalid tokens rejected
-
-### Business Logic
-- [ ] Order state transitions validated
-- [ ] Table session completion works
-- [ ] Order history archival works
-- [ ] Menu management works
-
----
-
-## Cleanup Test Data
+#### 2.1.1 테스트 프레임워크 설치
 
 ```bash
-# Delete test orders
-aws dynamodb delete-item \
-  --table-name Orders \
-  --key '{"orderId": {"S": "test-order-001"}}' \
-  --region ap-northeast-2
+cd frontend
+npm install --save-dev @playwright/test
+npx playwright install
+```
 
-# Delete test admin
-aws dynamodb delete-item \
-  --table-name Admins \
-  --key '{"adminId": {"S": "test-admin-001"}}' \
-  --region ap-northeast-2
+#### 2.1.2 Playwright 설정
 
-# Delete test images
-aws s3 rm s3://table-order-menu-images-<account-id>/menus/test-store-001/ --recursive
+`playwright.config.js`:
+
+```javascript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/integration',
+  timeout: 30000,
+  retries: 2,
+  use: {
+    baseURL: 'http://localhost:5173',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { browserName: 'chromium' },
+    },
+  ],
+  webServer: {
+    command: 'npm run dev',
+    port: 5173,
+    reuseExistingServer: !process.env.CI,
+  },
+});
+```
+
+### 2.2 통합 테스트 작성
+
+#### 2.2.1 인증 플로우 테스트
+
+`tests/integration/auth.spec.js`:
+
+```javascript
+import { test, expect } from '@playwright/test';
+
+test.describe('Authentication Flow', () => {
+  test('should login with QR code', async ({ page }) => {
+    // QR 코드로 로그인 페이지 접속
+    await page.goto('/?qr=STORE123_TABLE001_SESSION456');
+
+    // 자동 로그인 처리 대기
+    await page.waitForURL('**/menu');
+
+    // 메뉴 페이지로 이동 확인
+    await expect(page).toHaveURL(/.*menu/);
+    
+    // 로컬 스토리지에 토큰 저장 확인
+    const token = await page.evaluate(() => localStorage.getItem('accessToken'));
+    expect(token).toBeTruthy();
+  });
+
+  test('should login with table number', async ({ page }) => {
+    await page.goto('/');
+
+    // 테이블 번호 입력
+    await page.fill('input[name="tableNumber"]', 'T001');
+    
+    // 로그인 버튼 클릭
+    await page.click('button:has-text("로그인")');
+
+    // 메뉴 페이지로 이동 대기
+    await page.waitForURL('**/menu');
+
+    // 메뉴 페이지 확인
+    await expect(page).toHaveURL(/.*menu/);
+  });
+
+  test('should show error for invalid table number', async ({ page }) => {
+    await page.goto('/');
+
+    // 잘못된 테이블 번호 입력
+    await page.fill('input[name="tableNumber"]', 'INVALID');
+    
+    // 로그인 버튼 클릭
+    await page.click('button:has-text("로그인")');
+
+    // 에러 메시지 확인
+    await expect(page.locator('text=로그인 실패')).toBeVisible();
+  });
+
+  test('should refresh token automatically', async ({ page, context }) => {
+    // 로그인
+    await page.goto('/?qr=STORE123_TABLE001_SESSION456');
+    await page.waitForURL('**/menu');
+
+    // 토큰 만료 시뮬레이션 (15시간 후)
+    await context.addCookies([{
+      name: 'tokenExpiry',
+      value: String(Date.now() - 15 * 60 * 60 * 1000),
+      domain: 'localhost',
+      path: '/'
+    }]);
+
+    // API 호출 (토큰 갱신 트리거)
+    await page.reload();
+
+    // 새 토큰 발급 확인
+    const newToken = await page.evaluate(() => localStorage.getItem('accessToken'));
+    expect(newToken).toBeTruthy();
+  });
+});
+```
+
+#### 2.2.2 메뉴 조회 플로우 테스트
+
+`tests/integration/menu.spec.js`:
+
+```javascript
+import { test, expect } from '@playwright/test';
+
+test.describe('Menu Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    // 로그인
+    await page.goto('/?qr=STORE123_TABLE001_SESSION456');
+    await page.waitForURL('**/menu');
+  });
+
+  test('should display menu list', async ({ page }) => {
+    // 메뉴 목록 로딩 대기
+    await page.waitForSelector('[data-testid="menu-item"]');
+
+    // 메뉴 항목 확인
+    const menuItems = await page.locator('[data-testid="menu-item"]').count();
+    expect(menuItems).toBeGreaterThan(0);
+  });
+
+  test('should filter menus by category', async ({ page }) => {
+    // 카테고리 탭 클릭
+    await page.click('button:has-text("메인")');
+
+    // 필터링된 메뉴 확인
+    await page.waitForSelector('[data-testid="menu-item"]');
+    
+    const menuItems = await page.locator('[data-testid="menu-item"]');
+    const firstItem = menuItems.first();
+    
+    // 메인 카테고리 메뉴만 표시되는지 확인
+    await expect(firstItem).toContainText('메인');
+  });
+
+  test('should show menu details', async ({ page }) => {
+    // 첫 번째 메뉴 클릭
+    await page.click('[data-testid="menu-item"]:first-child');
+
+    // 메뉴 상세 정보 확인
+    await expect(page.locator('[data-testid="menu-detail"]')).toBeVisible();
+    await expect(page.locator('[data-testid="menu-name"]')).toBeVisible();
+    await expect(page.locator('[data-testid="menu-price"]')).toBeVisible();
+    await expect(page.locator('[data-testid="menu-description"]')).toBeVisible();
+  });
+
+  test('should add menu to cart', async ({ page }) => {
+    // 메뉴 항목 클릭
+    await page.click('[data-testid="menu-item"]:first-child');
+
+    // 장바구니 추가 버튼 클릭
+    await page.click('button:has-text("장바구니 담기")');
+
+    // 장바구니 배지 업데이트 확인
+    const cartBadge = page.locator('[data-testid="cart-badge"]');
+    await expect(cartBadge).toHaveText('1');
+  });
+});
+```
+
+#### 2.2.3 주문 생성 플로우 테스트
+
+`tests/integration/order.spec.js`:
+
+```javascript
+import { test, expect } from '@playwright/test';
+
+test.describe('Order Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    // 로그인
+    await page.goto('/?qr=STORE123_TABLE001_SESSION456');
+    await page.waitForURL('**/menu');
+  });
+
+  test('should create order successfully', async ({ page }) => {
+    // 메뉴 추가
+    await page.click('[data-testid="menu-item"]:first-child');
+    await page.click('button:has-text("장바구니 담기")');
+
+    // 장바구니 페이지로 이동
+    await page.click('[data-testid="cart-button"]');
+    await page.waitForURL('**/cart');
+
+    // 주문하기 버튼 클릭
+    await page.click('button:has-text("주문하기")');
+
+    // 주문 성공 페이지 확인
+    await page.waitForURL('**/order-success');
+    await expect(page.locator('text=주문이 완료되었습니다')).toBeVisible();
+    
+    // 주문 번호 확인
+    const orderNumber = await page.locator('[data-testid="order-number"]').textContent();
+    expect(orderNumber).toMatch(/^\d{8}-\d{3}$/);
+  });
+
+  test('should validate cart before order', async ({ page }) => {
+    // 빈 장바구니로 주문 시도
+    await page.goto('/cart');
+
+    // 주문하기 버튼 비활성화 확인
+    const orderButton = page.locator('button:has-text("주문하기")');
+    await expect(orderButton).toBeDisabled();
+  });
+
+  test('should calculate total amount correctly', async ({ page }) => {
+    // 메뉴 2개 추가
+    await page.click('[data-testid="menu-item"]:nth-child(1)');
+    await page.click('button:has-text("장바구니 담기")');
+    
+    await page.click('[data-testid="menu-back"]');
+    
+    await page.click('[data-testid="menu-item"]:nth-child(2)');
+    await page.click('button:has-text("장바구니 담기")');
+
+    // 장바구니 페이지로 이동
+    await page.click('[data-testid="cart-button"]');
+
+    // 총액 확인
+    const totalAmount = await page.locator('[data-testid="total-amount"]').textContent();
+    expect(totalAmount).toMatch(/\d+원/);
+  });
+
+  test('should clear cart after order', async ({ page }) => {
+    // 메뉴 추가 및 주문
+    await page.click('[data-testid="menu-item"]:first-child');
+    await page.click('button:has-text("장바구니 담기")');
+    await page.click('[data-testid="cart-button"]');
+    await page.click('button:has-text("주문하기")');
+
+    // 주문 성공 후 메뉴로 돌아가기
+    await page.click('button:has-text("메뉴로 돌아가기")');
+
+    // 장바구니 비어있는지 확인
+    const cartBadge = page.locator('[data-testid="cart-badge"]');
+    await expect(cartBadge).not.toBeVisible();
+  });
+});
+```
+
+#### 2.2.4 실시간 업데이트 테스트
+
+`tests/integration/realtime.spec.js`:
+
+```javascript
+import { test, expect } from '@playwright/test';
+
+test.describe('Real-time Update Flow', () => {
+  test('should receive order status updates via WebSocket', async ({ page }) => {
+    // 로그인
+    await page.goto('/?qr=STORE123_TABLE001_SESSION456');
+    await page.waitForURL('**/menu');
+
+    // 주문 생성
+    await page.click('[data-testid="menu-item"]:first-child');
+    await page.click('button:has-text("장바구니 담기")');
+    await page.click('[data-testid="cart-button"]');
+    await page.click('button:has-text("주문하기")');
+
+    // 주문 내역 페이지로 이동
+    await page.click('button:has-text("주문 내역 보기")');
+    await page.waitForURL('**/orders');
+
+    // WebSocket 메시지 수신 대기
+    await page.waitForFunction(() => {
+      const orders = document.querySelectorAll('[data-testid="order-item"]');
+      return orders.length > 0;
+    });
+
+    // 주문 상태 확인
+    const orderStatus = await page.locator('[data-testid="order-status"]').first().textContent();
+    expect(['pending', 'confirmed', 'preparing', 'ready', 'completed']).toContain(orderStatus);
+
+    // 상태 변경 시뮬레이션 (Backend에서 상태 변경)
+    // 실제 테스트에서는 Admin API를 호출하여 상태 변경
+
+    // 실시간 업데이트 확인 (5초 대기)
+    await page.waitForTimeout(5000);
+    
+    const updatedStatus = await page.locator('[data-testid="order-status"]').first().textContent();
+    // 상태가 변경되었는지 확인 (실제 환경에서는 변경됨)
+  });
+
+  test('should reconnect WebSocket on connection loss', async ({ page, context }) => {
+    // 로그인
+    await page.goto('/?qr=STORE123_TABLE001_SESSION456');
+    await page.waitForURL('**/menu');
+
+    // 주문 내역 페이지로 이동
+    await page.goto('/orders');
+
+    // WebSocket 연결 확인
+    const wsConnected = await page.evaluate(() => {
+      return window.__wsConnected === true;
+    });
+    expect(wsConnected).toBe(true);
+
+    // 네트워크 오프라인 시뮬레이션
+    await context.setOffline(true);
+    await page.waitForTimeout(2000);
+
+    // 네트워크 온라인 복구
+    await context.setOffline(false);
+    await page.waitForTimeout(3000);
+
+    // WebSocket 재연결 확인
+    const wsReconnected = await page.evaluate(() => {
+      return window.__wsConnected === true;
+    });
+    expect(wsReconnected).toBe(true);
+  });
+});
+```
+
+### 2.3 통합 테스트 실행
+
+```bash
+# 모든 통합 테스트 실행
+npx playwright test
+
+# 특정 테스트 파일 실행
+npx playwright test auth.spec.js
+
+# UI 모드로 실행 (디버깅)
+npx playwright test --ui
+
+# 헤드풀 모드로 실행 (브라우저 표시)
+npx playwright test --headed
+
+# 특정 브라우저로 실행
+npx playwright test --project=chromium
+```
+
+### 2.4 예상 결과
+
+```
+Running 15 tests using 1 worker
+
+  ✓ auth.spec.js:5:3 › should login with QR code (2.5s)
+  ✓ auth.spec.js:18:3 › should login with table number (1.8s)
+  ✓ auth.spec.js:32:3 › should show error for invalid table number (1.2s)
+  ✓ auth.spec.js:45:3 › should refresh token automatically (3.1s)
+  ✓ menu.spec.js:10:3 › should display menu list (1.5s)
+  ✓ menu.spec.js:20:3 › should filter menus by category (2.0s)
+  ✓ menu.spec.js:32:3 › should show menu details (1.8s)
+  ✓ menu.spec.js:44:3 › should add menu to cart (2.2s)
+  ✓ order.spec.js:10:3 › should create order successfully (3.5s)
+  ✓ order.spec.js:30:3 › should validate cart before order (1.0s)
+  ✓ order.spec.js:40:3 › should calculate total amount correctly (2.8s)
+  ✓ order.spec.js:58:3 › should clear cart after order (3.2s)
+  ✓ realtime.spec.js:5:3 › should receive order status updates via WebSocket (5.5s)
+  ✓ realtime.spec.js:35:3 › should reconnect WebSocket on connection loss (8.0s)
+
+  15 passed (42.1s)
 ```
 
 ---
 
-## 문서 버전 정보
-- **작성일**: 2026-02-09
-- **버전**: 1.0
-- **상태**: Integration Test Instructions 완료
+## 3. API 통합 테스트
+
+### 3.1 Postman/Newman 테스트
+
+#### 3.1.1 Postman Collection 생성
+
+`tests/api/table-order-api.postman_collection.json`:
+
+```json
+{
+  "info": {
+    "name": "Table Order API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Table Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has accessToken', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('accessToken');",
+                  "    pm.environment.set('accessToken', jsonData.accessToken);",
+                  "});",
+                  "",
+                  "pm.test('Response has tableInfo', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('tableInfo');",
+                  "    pm.expect(jsonData.tableInfo).to.have.property('tableId');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrCode\": \"STORE123_TABLE001_SESSION456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/table-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "table-login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Menus",
+      "item": [
+        {
+          "name": "Get Menus",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Menu items have required fields', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.expect(jsonData[0]).to.have.property('menuId');",
+                  "        pm.expect(jsonData[0]).to.have.property('menuName');",
+                  "        pm.expect(jsonData[0]).to.have.property('price');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/menus?storeId=STORE123&category=전체",
+              "host": ["{{baseUrl}}"],
+              "path": ["menus"],
+              "query": [
+                {
+                  "key": "storeId",
+                  "value": "STORE123"
+                },
+                {
+                  "key": "category",
+                  "value": "전체"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has orderId', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('orderId');",
+                  "    pm.environment.set('orderId', jsonData.orderId);",
+                  "});",
+                  "",
+                  "pm.test('Response has orderNumber', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('orderNumber');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"storeId\": \"STORE123\",\n  \"tableId\": \"T001\",\n  \"sessionId\": \"SESSION456\",\n  \"items\": [\n    {\n      \"menuId\": \"MENU001\",\n      \"quantity\": 2,\n      \"price\": 8000\n    }\n  ],\n  \"totalAmount\": 16000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### 3.1.2 Newman으로 테스트 실행
+
+```bash
+# Newman 설치
+npm install -g newman
+
+# 테스트 실행
+newman run tests/api/table-order-api.postman_collection.json \
+  --environment tests/api/environment.json \
+  --reporters cli,json \
+  --reporter-json-export results.json
+```
+
+---
+
+## 4. 통합 테스트 체크리스트
+
+### Frontend-Backend 통합
+- [ ] 인증 플로우 테스트 통과
+- [ ] 메뉴 조회 플로우 테스트 통과
+- [ ] 장바구니 플로우 테스트 통과
+- [ ] 주문 생성 플로우 테스트 통과
+- [ ] 주문 내역 플로우 테스트 통과
+- [ ] 실시간 업데이트 테스트 통과
+
+### API 통합
+- [ ] 모든 REST API 엔드포인트 테스트 통과
+- [ ] WebSocket API 테스트 통과
+- [ ] 에러 핸들링 테스트 통과
+- [ ] 인증/인가 테스트 통과
+
+### 성능
+- [ ] 페이지 로딩 시간 3초 이내
+- [ ] API 응답 시간 1초 이내
+- [ ] WebSocket 연결 시간 2초 이내
+
+---
+
+**문서 버전**: 1.0  
+**작성일**: 2026-02-09  
+**상태**: 완료

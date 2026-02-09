@@ -1,276 +1,452 @@
-# Build Instructions - Admin Unit
+# Build Instructions - Customer Unit
 
-## Prerequisites
+## 개요
 
-### Required Tools
-- **Node.js**: 18.x LTS
-- **npm**: 9.x
-- **TypeScript**: 5.3.0
-- **AWS CLI**: 2.x (configured with credentials)
-
-### Required AWS Resources
-- DynamoDB tables (7 tables)
-- S3 bucket for menu images
-- SSM Parameter Store (JWT secret)
-- IAM roles for Lambda functions
-
-### Environment Variables
-```bash
-JWT_SECRET=<from-ssm-parameter-store>
-DYNAMODB_REGION=ap-northeast-2
-S3_BUCKET=table-order-menu-images-<account-id>
-S3_REGION=ap-northeast-2
-NODE_ENV=production
-```
+Customer Unit의 Frontend와 Backend를 빌드하고 배포하기 위한 상세 지침입니다.
 
 ---
 
-## Build Steps
+## 1. Frontend 빌드
 
-### 1. Install Dependencies
+### 1.1 사전 요구사항
+
+- Node.js 18.x 이상
+- npm 9.x 이상
+- AWS CLI (배포용)
+
+### 1.2 의존성 설치
 
 ```bash
-cd admin-api
+cd frontend
 npm install
 ```
 
-**Expected Output**:
-```
-added 150 packages in 15s
-```
+**예상 결과**: `node_modules/` 디렉토리 생성 및 모든 의존성 설치 완료
 
-**Verify Installation**:
-```bash
-npm list --depth=0
-```
+### 1.3 환경 변수 설정
 
-Should show:
-- aws-sdk@^2.1500.0
-- bcrypt@^5.1.1
-- jsonwebtoken@^9.0.2
-- uuid@^9.0.1
-- typescript@^5.3.0
-- eslint@^8.56.0
-- prettier@^3.1.0
-
----
-
-### 2. Configure Environment
-
-Create `.env` file (for local testing):
-```bash
-cat > .env << EOF
-JWT_SECRET=your-local-jwt-secret-min-32-chars
-DYNAMODB_REGION=ap-northeast-2
-S3_BUCKET=table-order-menu-images-123456789012
-S3_REGION=ap-northeast-2
-NODE_ENV=development
-EOF
-```
-
-**Note**: For production, use AWS SSM Parameter Store.
-
----
-
-### 3. Lint Code
+`.env` 파일 생성:
 
 ```bash
-npm run lint
+# Development
+VITE_API_BASE_URL=https://your-api-gateway-url.execute-api.ap-northeast-2.amazonaws.com/prod
+VITE_WS_URL=wss://your-websocket-url.execute-api.ap-northeast-2.amazonaws.com/prod
+
+# Production
+VITE_API_BASE_URL=https://api.yourdomain.com
+VITE_WS_URL=wss://ws.yourdomain.com
 ```
 
-**Expected Output**:
-```
-✔ No linting errors found
-```
+### 1.4 로컬 개발 서버 실행
 
-**If Errors Found**:
 ```bash
-npm run lint -- --fix
+npm run dev
 ```
 
----
+**예상 결과**:
+```
+VITE v5.0.8  ready in 500 ms
 
-### 4. Build TypeScript
+➜  Local:   http://localhost:5173/
+➜  Network: use --host to expose
+```
+
+브라우저에서 `http://localhost:5173` 접속하여 앱 확인
+
+### 1.5 프로덕션 빌드
 
 ```bash
 npm run build
 ```
 
-**Expected Output**:
+**예상 결과**:
+- `dist/` 디렉토리 생성
+- 최적화된 정적 파일 생성 (HTML, CSS, JS)
+- 빌드 성공 메시지 출력
+
+**빌드 산출물**:
 ```
-Compiled successfully.
 dist/
-├── handlers/
-├── services/
-├── repositories/
-├── middleware/
-├── utils/
-└── index.js
+├── index.html
+├── assets/
+│   ├── index-[hash].js
+│   ├── index-[hash].css
+│   └── [other assets]
+└── favicon.ico
 ```
 
-**Verify Build**:
-```bash
-ls -la dist/
-```
-
-Should contain compiled JavaScript files.
-
----
-
-### 5. Create Deployment Package
+### 1.6 빌드 검증
 
 ```bash
-# Remove old package
-rm -f deployment-package.zip
-
-# Create new package
-zip -r deployment-package.zip dist/ node_modules/ package.json
-
-# Verify package
-unzip -l deployment-package.zip | head -20
+npm run preview
 ```
 
-**Expected Package Size**: 15-25 MB
+**예상 결과**: 프로덕션 빌드를 로컬에서 미리보기 (http://localhost:4173)
 
----
-
-### 6. Deploy to AWS Lambda
+### 1.7 S3 배포
 
 ```bash
-# Deploy Admin API Lambda
-aws lambda update-function-code \
-  --function-name table-order-admin-api \
-  --zip-file fileb://deployment-package.zip \
-  --region ap-northeast-2
+# S3 버킷 생성 (최초 1회)
+aws s3 mb s3://table-order-frontend --region ap-northeast-2
 
-# Wait for deployment to complete
-aws lambda wait function-updated \
-  --function-name table-order-admin-api \
-  --region ap-northeast-2
+# 정적 웹사이트 호스팅 설정
+aws s3 website s3://table-order-frontend \
+  --index-document index.html \
+  --error-document index.html
 
-# Verify deployment
-aws lambda get-function \
-  --function-name table-order-admin-api \
-  --region ap-northeast-2 \
-  --query 'Configuration.[FunctionName,Runtime,LastModified]'
+# 빌드 파일 업로드
+aws s3 sync dist/ s3://table-order-frontend/ \
+  --delete \
+  --cache-control "public, max-age=31536000" \
+  --exclude "index.html"
+
+# index.html은 캐시 없이 업로드
+aws s3 cp dist/index.html s3://table-order-frontend/index.html \
+  --cache-control "no-cache, no-store, must-revalidate"
+
+# 버킷 정책 설정 (공개 읽기)
+aws s3api put-bucket-policy \
+  --bucket table-order-frontend \
+  --policy '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::table-order-frontend/*"
+    }]
+  }'
 ```
 
-**Expected Output**:
-```json
-[
-  "table-order-admin-api",
-  "nodejs18.x",
-  "2026-02-09T14:30:00.000+0000"
-]
+### 1.8 CloudFront 배포 (선택사항)
+
+```bash
+# CloudFront 무효화 (캐시 갱신)
+aws cloudfront create-invalidation \
+  --distribution-id YOUR_DISTRIBUTION_ID \
+  --paths "/*"
 ```
 
 ---
 
-### 7. Update Lambda Environment Variables
+## 2. Backend 빌드
+
+### 2.1 사전 요구사항
+
+- Node.js 18.x 이상
+- AWS CLI
+- AWS SAM CLI (선택사항 - IaC 배포용)
+
+### 2.2 Lambda 함수별 빌드
+
+각 Lambda 함수는 독립적으로 빌드 및 배포됩니다.
+
+#### 2.2.1 Auth Lambda 빌드
 
 ```bash
-aws lambda update-function-configuration \
-  --function-name table-order-admin-api \
+cd backend/functions/auth
+npm install --production
+
+# 배포 패키지 생성
+zip -r function.zip . -x "*.git*" -x "node_modules/aws-sdk/*"
+```
+
+**예상 결과**: `function.zip` 파일 생성 (약 1-2MB)
+
+#### 2.2.2 기타 Lambda 함수 빌드
+
+동일한 방식으로 각 Lambda 함수 빌드:
+
+```bash
+# Menus Lambda
+cd backend/functions/menus
+npm install --production
+zip -r function.zip .
+
+# Orders Create Lambda
+cd backend/functions/orders-create
+npm install --production
+zip -r function.zip .
+
+# Orders List Lambda
+cd backend/functions/orders-list
+npm install --production
+zip -r function.zip .
+
+# WebSocket Connect Lambda
+cd backend/functions/websocket-connect
+npm install --production
+zip -r function.zip .
+
+# WebSocket Disconnect Lambda
+cd backend/functions/websocket-disconnect
+npm install --production
+zip -r function.zip .
+
+# WebSocket Message Lambda
+cd backend/functions/websocket-message
+npm install --production
+zip -r function.zip .
+
+# Stream Processor Lambda
+cd backend/functions/stream-processor
+npm install --production
+zip -r function.zip .
+```
+
+### 2.3 Lambda 함수 배포
+
+#### 2.3.1 Lambda 함수 생성 (최초 1회)
+
+```bash
+# Auth Lambda 생성
+aws lambda create-function \
+  --function-name table-order-auth \
+  --runtime nodejs18.x \
+  --role arn:aws:iam::YOUR_ACCOUNT_ID:role/lambda-execution-role \
+  --handler index.handler \
+  --zip-file fileb://backend/functions/auth/function.zip \
+  --timeout 30 \
+  --memory-size 256 \
   --environment Variables="{
-    JWT_SECRET=$(aws ssm get-parameter --name /table-order/jwt-secret --with-decryption --query Parameter.Value --output text),
-    DYNAMODB_REGION=ap-northeast-2,
-    S3_BUCKET=table-order-menu-images-$(aws sts get-caller-identity --query Account --output text),
-    S3_REGION=ap-northeast-2,
-    NODE_ENV=production
-  }" \
-  --region ap-northeast-2
+    DYNAMODB_TABLE_NAME=table-order-data,
+    JWT_SECRET=your-secret-key-change-in-production,
+    JWT_ACCESS_EXPIRATION=16h,
+    JWT_REFRESH_EXPIRATION=30d,
+    AWS_REGION=ap-northeast-2
+  }"
+```
+
+동일한 방식으로 다른 Lambda 함수들도 생성합니다.
+
+#### 2.3.2 Lambda 함수 업데이트 (코드 변경 시)
+
+```bash
+# Auth Lambda 업데이트
+aws lambda update-function-code \
+  --function-name table-order-auth \
+  --zip-file fileb://backend/functions/auth/function.zip
+
+# 환경 변수 업데이트 (필요 시)
+aws lambda update-function-configuration \
+  --function-name table-order-auth \
+  --environment Variables="{
+    DYNAMODB_TABLE_NAME=table-order-data,
+    JWT_SECRET=your-secret-key,
+    JWT_ACCESS_EXPIRATION=16h,
+    JWT_REFRESH_EXPIRATION=30d,
+    AWS_REGION=ap-northeast-2
+  }"
+```
+
+### 2.4 API Gateway 설정
+
+#### 2.4.1 REST API 생성
+
+```bash
+# REST API 생성
+aws apigateway create-rest-api \
+  --name table-order-api \
+  --description "Table Order REST API" \
+  --endpoint-configuration types=REGIONAL
+
+# 리소스 및 메서드 생성 (예: /auth/table-login)
+# ... (상세 설정은 Infrastructure 문서 참조)
+```
+
+#### 2.4.2 WebSocket API 생성
+
+```bash
+# WebSocket API 생성
+aws apigatewayv2 create-api \
+  --name table-order-websocket \
+  --protocol-type WEBSOCKET \
+  --route-selection-expression '$request.body.action'
+
+# 라우트 생성 ($connect, $disconnect, $default)
+# ... (상세 설정은 Infrastructure 문서 참조)
+```
+
+### 2.5 DynamoDB 테이블 생성
+
+```bash
+# DynamoDB 테이블 생성
+aws dynamodb create-table \
+  --table-name table-order-data \
+  --attribute-definitions \
+    AttributeName=PK,AttributeType=S \
+    AttributeName=SK,AttributeType=S \
+    AttributeName=storeId,AttributeType=S \
+    AttributeName=tableId,AttributeType=S \
+  --key-schema \
+    AttributeName=PK,KeyType=HASH \
+    AttributeName=SK,KeyType=RANGE \
+  --global-secondary-indexes \
+    '[
+      {
+        "IndexName": "storeId-index",
+        "KeySchema": [
+          {"AttributeName": "storeId", "KeyType": "HASH"},
+          {"AttributeName": "SK", "KeyType": "RANGE"}
+        ],
+        "Projection": {"ProjectionType": "ALL"},
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 5,
+          "WriteCapacityUnits": 5
+        }
+      },
+      {
+        "IndexName": "tableId-index",
+        "KeySchema": [
+          {"AttributeName": "tableId", "KeyType": "HASH"},
+          {"AttributeName": "SK", "KeyType": "RANGE"}
+        ],
+        "Projection": {"ProjectionType": "ALL"},
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 5,
+          "WriteCapacityUnits": 5
+        }
+      }
+    ]' \
+  --provisioned-throughput \
+    ReadCapacityUnits=5,WriteCapacityUnits=5 \
+  --stream-specification \
+    StreamEnabled=true,StreamViewType=NEW_AND_OLD_IMAGES
+```
+
+### 2.6 DynamoDB Streams 연결
+
+```bash
+# Stream ARN 확인
+aws dynamodb describe-table \
+  --table-name table-order-data \
+  --query 'Table.LatestStreamArn'
+
+# Stream Processor Lambda에 이벤트 소스 매핑
+aws lambda create-event-source-mapping \
+  --function-name table-order-stream-processor \
+  --event-source-arn arn:aws:dynamodb:ap-northeast-2:YOUR_ACCOUNT_ID:table/table-order-data/stream/STREAM_ID \
+  --starting-position LATEST \
+  --batch-size 10
 ```
 
 ---
 
-### 8. Verify Build Success
+## 3. 빌드 자동화 (CI/CD)
 
-**Check Lambda Function**:
-```bash
-aws lambda invoke \
-  --function-name table-order-admin-api \
-  --payload '{"httpMethod":"GET","path":"/health"}' \
-  --region ap-northeast-2 \
-  response.json
+### 3.1 GitHub Actions 예시
 
-cat response.json
+`.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+      - name: Deploy to S3
+        run: |
+          aws s3 sync frontend/dist/ s3://table-order-frontend/ --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Deploy Lambda Functions
+        run: |
+          cd backend/functions/auth
+          npm ci --production
+          zip -r function.zip .
+          aws lambda update-function-code \
+            --function-name table-order-auth \
+            --zip-file fileb://function.zip
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
-**Expected**: Function executes without errors (even if route not found).
+---
+
+## 4. 빌드 검증 체크리스트
+
+### Frontend
+- [ ] `npm install` 성공
+- [ ] `npm run build` 성공
+- [ ] `dist/` 디렉토리 생성 확인
+- [ ] `npm run preview`로 로컬 테스트 성공
+- [ ] S3 업로드 성공
+- [ ] 브라우저에서 접속 확인
+
+### Backend
+- [ ] 각 Lambda 함수 `npm install` 성공
+- [ ] 각 Lambda 함수 `function.zip` 생성 확인
+- [ ] Lambda 함수 배포 성공
+- [ ] API Gateway 엔드포인트 생성 확인
+- [ ] DynamoDB 테이블 생성 확인
+- [ ] Lambda 함수 로그 확인 (CloudWatch)
 
 ---
 
-## Build Artifacts
+## 5. 트러블슈팅
 
-### Generated Files
-- `dist/` - Compiled JavaScript
-- `deployment-package.zip` - Lambda deployment package
-- `node_modules/` - Dependencies
+### Frontend 빌드 실패
 
-### Artifact Locations
-- **Local**: `./admin-api/dist/`
-- **Lambda**: Deployed to AWS Lambda function
-- **Package**: `./admin-api/deployment-package.zip`
-
----
-
-## Troubleshooting
-
-### Build Fails with "Cannot find module"
-**Cause**: Missing dependencies
-**Solution**:
+**문제**: `npm run build` 실패
+**해결**:
 ```bash
+# 캐시 삭제 후 재시도
 rm -rf node_modules package-lock.json
 npm install
 npm run build
 ```
 
-### Build Fails with TypeScript Errors
-**Cause**: Type errors in code
-**Solution**:
-1. Review error messages
-2. Fix type issues in source files
-3. Run `npm run build` again
+### Lambda 배포 실패
 
-### Deployment Fails with "ResourceNotFoundException"
-**Cause**: Lambda function doesn't exist
-**Solution**:
-1. Create Lambda function first via AWS Console or CloudFormation
-2. Then deploy code with `update-function-code`
+**문제**: Lambda 함수 업데이트 실패
+**해결**:
+```bash
+# IAM 권한 확인
+aws iam get-role --role-name lambda-execution-role
 
-### Lambda Invocation Fails
-**Cause**: Missing environment variables or IAM permissions
-**Solution**:
-1. Verify environment variables are set
-2. Check IAM role has DynamoDB and S3 permissions
-3. Review CloudWatch Logs for detailed errors
+# Lambda 함수 로그 확인
+aws logs tail /aws/lambda/table-order-auth --follow
+```
 
----
+### S3 업로드 실패
 
-## Build Verification Checklist
+**문제**: S3 업로드 권한 오류
+**해결**:
+```bash
+# AWS CLI 자격 증명 확인
+aws sts get-caller-identity
 
-- [ ] Dependencies installed successfully
-- [ ] Code lints without errors
-- [ ] TypeScript compiles successfully
-- [ ] Deployment package created
-- [ ] Lambda function updated
-- [ ] Environment variables configured
-- [ ] Lambda function invokes successfully
-- [ ] CloudWatch Logs show no errors
+# S3 버킷 정책 확인
+aws s3api get-bucket-policy --bucket table-order-frontend
+```
 
 ---
 
-## Next Steps
-
-After successful build:
-1. Proceed to Unit Test Execution
-2. Run Integration Tests
-3. Verify API Gateway integration
-4. Test end-to-end workflows
-
----
-
-## 문서 버전 정보
-- **작성일**: 2026-02-09
-- **버전**: 1.0
-- **상태**: Build Instructions 완료
+**문서 버전**: 1.0  
+**작성일**: 2026-02-09  
+**상태**: 완료
