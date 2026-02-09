@@ -1,0 +1,37 @@
+{
+  "name": "table-order-admin-api",
+  "version": "1.0.0",
+  "description": "Table Order Admin API",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "dev": "nodemon --exec ts-node -r dotenv/config src/local-server.ts dotenv_config_path=.env.local",
+    "start:local": "ts-node -r dotenv/config src/local-server.ts dotenv_config_path=.env.local"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1500.0",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.130",
+    "@types/bcrypt": "^5.0.2",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^18.19.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "aws-sdk-mock": "^6.2.2",
+    "dotenv": "^17.2.4",
+    "eslint": "^8.56.0",
+    "express": "^5.2.1",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.1.0",
+    "serverless-offline": "^14.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}

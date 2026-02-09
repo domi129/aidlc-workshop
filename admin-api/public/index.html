@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Table Order System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 24px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .login-container h2 {
+            margin-bottom: 30px;
+            color: #2c3e50;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3498db;
+        }
+
+        .card h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-preparing {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .order-items {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+
+        .order-items li {
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        .card-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <h2>🍽️ Admin Login</h2>
+        <div id="loginError" class="error hidden"></div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="username" value="admin1" required>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" value="password123" required>
+            </div>
+            <div class="form-group">
+                <label>Store ID</label>
+                <input type="text" id="storeId" value="store-001" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+        </form>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden">
+        <div class="container">
+            <div class="header">
+                <h1>🍽️ Admin Dashboard</h1>
+                <div class="user-info">
+                    <span id="userInfo"></span>
+                    <button class="btn btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('orders')">📋 Orders</button>
+                <button class="tab" onclick="switchTab('menus')">🍜 Menus</button>
+                <button class="tab" onclick="switchTab('tables')">🪑 Tables</button>
+            </div>
+
+            <!-- Orders Tab -->
+            <div id="ordersTab" class="tab-content active">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Current Orders</h2>
+                    <button class="btn btn-primary" onclick="loadOrders()">🔄 Refresh</button>
+                </div>
+                <div id="ordersContent" class="loading">Loading orders...</div>
+            </div>
+
+            <!-- Menus Tab -->
+            <div id="menusTab" class="tab-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Menu Management</h2>
+                    <button class="btn btn-success" onclick="showAddMenuModal()">➕ Add Menu</button>
+                </div>
+                <div id="menusContent" class="loading">Loading menus...</div>
+            </div>
+
+            <!-- Tables Tab -->
+            <div id="tablesTab" class="tab-content">
+                <h2>Table Management</h2>
+                <p style="color: #999; margin-top: 20px;">Table management features coming soon...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Menu Modal -->
+    <div id="addMenuModal" class="modal">
+        <div class="modal-content">
+            <h3>Add New Menu</h3>
+            <form id="addMenuForm">
+                <div class="form-group">
+                    <label>Menu Name</label>
+                    <input type="text" id="menuName" required>
+                </div>
+                <div class="form-group">
+                    <label>Price (₩)</label>
+                    <input type="number" id="menuPrice" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="menuDescription">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="menuCategory" class="form-group input" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px;">
+                        <option value="MAIN">Main Dish</option>
+                        <option value="SIDE">Side Dish</option>
+                        <option value="DRINK">Drink</option>
+                        <option value="DESSERT">Dessert</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-success" style="flex: 1;">Add Menu</button>
+                    <button type="button" class="btn btn-danger" onclick="closeAddMenuModal()" style="flex: 1;">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let token = null;
+        let currentUser = null;
+
+        // Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const storeId = document.getElementById('storeId').value;
+
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, storeId })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    token = data.token;
+                    currentUser = data.admin;
+                    document.getElementById('loginScreen').classList.add('hidden');
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    document.getElementById('userInfo').textContent = `${currentUser.username} (${currentUser.role})`;
+                    loadOrders();
+                } else {
+                    document.getElementById('loginError').textContent = data.error.message;
+                    document.getElementById('loginError').classList.remove('hidden');
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = 'Login failed: ' + error.message;
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        });
+
+        // Logout
+        function logout() {
+            token = null;
+            currentUser = null;
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('loginError').classList.add('hidden');
+        }
+
+        // Switch Tab
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+
+            if (tabName === 'orders') loadOrders();
+            if (tabName === 'menus') loadMenus();
+        }
+
+        // Load Orders
+        async function loadOrders() {
+            const content = document.getElementById('ordersContent');
+            content.innerHTML = '<div class="loading">Loading orders...</div>';
+
+            try {
+                const response = await fetch('/orders', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const orders = await response.json();
+
+                if (orders.length === 0) {
+                    content.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">No orders found</p>';
+                    return;
+                }
+
+                content.innerHTML = '<div class="card-grid">' + orders.map(order => `
+                    <div class="card">
+                        <h3>Order #${order.orderNumber} - Table ${order.tableId}</h3>
+                        <p><strong>Status:</strong> <span class="status-badge status-${order.status.toLowerCase()}">${order.status}</span></p>
+                        <p><strong>Total:</strong> ₩${order.totalAmount.toLocaleString()}</p>
+                        <ul class="order-items">
+                            ${order.items.map(item => `<li>${item.menuName} x${item.quantity} (₩${item.price.toLocaleString()})</li>`).join('')}
+                        </ul>
+                        <div class="card-actions">
+                            ${order.status === 'PENDING' ? `<button class="btn btn-primary" onclick="updateOrderStatus('${order.orderId}', 'PREPARING')">Start Preparing</button>` : ''}
+                            ${order.status === 'PREPARING' ? `<button class="btn btn-success" onclick="updateOrderStatus('${order.orderId}', 'COMPLETED')">Complete</button>` : ''}
+                            ${order.status === 'PENDING' ? `<button class="btn btn-danger" onclick="deleteOrder('${order.orderId}')">Delete</button>` : ''}
+                        </div>
+                    </div>
+                `).join('') + '</div>';
+            } catch (error) {
+                content.innerHTML = `<div class="error">Failed to load orders: ${error.message}</div>`;
+            }
+        }
+
+        // Update Order Status
+        async function updateOrderStatus(orderId, status) {
+            try {
+                const response = await fetch(`/orders/${orderId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+
+                if (response.ok) {
+                    loadOrders();
+                } else {
+                    const data = await response.json();
+                    alert('Failed to update order: ' + data.error.message);
+                }
+            } catch (error) {
+                alert('Failed to update order: ' + error.message);
+            }
+        }
+
+        // Delete Order
+        async function deleteOrder(orderId) {
+            if (!confirm('Are you sure you want to delete this order?')) return;
+
+            try {
+                const response = await fetch(`/orders/${orderId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    loadOrders();
+                } else {
+                    const data = await response.json();
+                    alert('Failed to delete order: ' + data.error.message);
+                }
+            } catch (error) {
+                alert('Failed to delete order: ' + error.message);
+            }
+        }
+
+        // Load Menus
+        async function loadMenus() {
+            const content = document.getElementById('menusContent');
+            content.innerHTML = '<div class="loading">Loading menus...</div>';
+
+            try {
+                const response = await fetch('/menus', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const menus = await response.json();
+
+                content.innerHTML = '<div class="card-grid">' + menus.map(menu => `
+                    <div class="card">
+                        <h3>${menu.menuName}</h3>
+                        <p><strong>Price:</strong> ₩${menu.price.toLocaleString()}</p>
+                        <p><strong>Category:</strong> ${menu.category}</p>
+                        ${menu.description ? `<p>${menu.description}</p>` : ''}
+                        <p><strong>Available:</strong> ${menu.isAvailable ? '✅ Yes' : '❌ No'}</p>
+                        <div class="card-actions">
+                            <button class="btn btn-danger" onclick="deleteMenu('${menu.menuId}')">Delete</button>
+                        </div>
+                    </div>
+                `).join('') + '</div>';
+            } catch (error) {
+                content.innerHTML = `<div class="error">Failed to load menus: ${error.message}</div>`;
+            }
+        }
+
+        // Show Add Menu Modal
+        function showAddMenuModal() {
+            document.getElementById('addMenuModal').classList.add('active');
+        }
+
+        // Close Add Menu Modal
+        function closeAddMenuModal() {
+            document.getElementById('addMenuModal').classList.remove('active');
+            document.getElementById('addMenuForm').reset();
+        }
+
+        // Add Menu
+        document.getElementById('addMenuForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const menuData = {
+                menuName: document.getElementById('menuName').value,
+                price: parseInt(document.getElementById('menuPrice').value),
+                description: document.getElementById('menuDescription').value,
+                category: document.getElementById('menuCategory').value
+            };
+
+            try {
+                const response = await fetch('/menus', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(menuData)
+                });
+
+                if (response.ok) {
+                    closeAddMenuModal();
+                    loadMenus();
+                } else {
+                    const data = await response.json();
+                    alert('Failed to add menu: ' + data.error.message);
+                }
+            } catch (error) {
+                alert('Failed to add menu: ' + error.message);
+            }
+        });
+
+        // Delete Menu
+        async function deleteMenu(menuId) {
+            if (!confirm('Are you sure you want to delete this menu?')) return;
+
+            try {
+                const response = await fetch(`/menus/${menuId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    loadMenus();
+                } else {
+                    const data = await response.json();
+                    alert('Failed to delete menu: ' + data.error.message);
+                }
+            } catch (error) {
+                alert('Failed to delete menu: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
